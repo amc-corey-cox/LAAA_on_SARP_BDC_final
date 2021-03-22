@@ -1,0 +1,29 @@
+---
+title: "LAAA on SARP BDC"
+author: "Corey Cox"
+date: "3/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## R Markdown
+
+
+```{r cars}
+pheno.file <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv"
+
+phenos <- pheno.file %>% read_tsv
+```
+
+## Stuff
+
+
+
+```{r echo=FALSE}
+phenos %>% select(TopMed_ID) %>% write_tsv("SARP.txt", col_names = FALSE)
+```
+.
