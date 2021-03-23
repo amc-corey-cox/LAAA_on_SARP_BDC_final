@@ -55,7 +55,9 @@ pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_c
     center = col_character()
   ))
 
-pheno %>% select(TopMed_ID) %>% write_tsv("SARP.txt", col_names = FALSE)
+pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) ) %>% select(TopMed_ID)
+pheno_IDs %>% nrow
+pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
 
 ### Checklist
