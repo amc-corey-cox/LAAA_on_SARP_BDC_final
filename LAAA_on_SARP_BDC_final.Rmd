@@ -10,20 +10,74 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
-## R Markdown
+# SARP LAAA on BioDataCatalyst
+We'll be performing fine mapping using LAAA on BioDataCatalyst for SARP admixture reruns for the over 12 participants in SARP1/2 + CSGA.
+
+### Data files
+* `Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv`
+  - Complete "locked" phenotype file for SARP 1/2,  CSGA and SARP 3
+  - Originally from Complete SARP CSGA 3-4-21 cut.xlsx
+  - Received from Victory Ortega 4-Mar-2021
+  - Cleanup and select variables with clean_Complete_SARP_CSGA_pheno.R
+
+### Data Locations
+* BioDataCatalyst: SARP_chip_local_ancestry
+  - Local ancestry already run on chr1, 8, 12
+* Imputed: Pegasus- "/Volumes/Promise Pegasus/gitlab/ORTEGA/csga_imputation/data/output"
+  - filenames: chr${chr}.vcf.gz
+  - only samples with NO WGS data are included in imputed (so no sample overlap)
+  - Use unzip_results.sh script to unzip relevant chromosomes
+* WGS: Pegasus- "/Volumes/Promise Pegasus/dbgap_downloads/78082/topmed-dcc/exchange/phs001446_TOPMed_WGS_SARP/Combined_Study_Data/Genotypes/freeze.8/phased/"
+  - filenames: freeze.8.chr${chr}.pass_only.phased.bcf
+  - use get_sarp_chr.sh to extract relevant chromosomes
+  - extract to: "/Volumes/Promise Pegasus/topmed_freeze8_phased_sarp/"
+  - extract filename: chr${chr}.vcf.gz
+  - rextract with current IDs
+
+### Other notes
+CSGA+SARP12 is the discovery data set and we are aiming to identify allele dose associations in the discovery data set, which we will assess replication for using the SARP3 WGS data. For BARD, we used P < 0.001 to bring forward SNPs for replication. This should be OK, but if it asked for by a reviewer, the BDC app calc_nr_indep_snps can be used to estimate the number of independent variants in a peak, and then the P-value cut-off would be 0.05/nr_indep_snps.
+
+Chromosomes identified from SARP_admixture_rerun_no_under12:
+chr1, chr8, chr9, chr11, chr16, chr19
+
+* 2-puffs_albuterol... : chr11
+* FEV1: none
+* FVC: chr16
+* maxFEV1: chr1
+* maxFEV1_reversal: chr9, chr19
+* maxFVC: chr8
 
 
-```{r cars}
-pheno.file <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv"
+```{r get_SARP_IDs}
+pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv" %>%
+  read_tsv(col_types = cols(
+    .default = col_double(),
+    `ID SARP1-2 preferred` = col_character(),
+    TopMed_ID = col_character(),
+    `Study group` = col_character(),
+    SITE = col_character(),
+    `Clinical Center` = col_character(),
+    `ALL COHORT Based on COMBINED Analysis` = col_character(),
+    `SARP ethnic group` = col_character(),
+    group = col_character(),
+    Clinical.Center = col_character(),
+    id = col_character(),
+    center = col_character()
+  ))
 
-phenos <- pheno.file %>% read_tsv
+pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) ) %>% select(TopMed_ID)
+pheno_IDs %>% nrow
+pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
 
-## Stuff
+#### Checklist
+
+- [ ] Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
+- [ ] Create phenotype files with outcomes and covariates needed to fine-map any significant admixture mapping peaks - create separate phenotype files for imputed data, SARP12 samples with WGS data, SARP3 samples with WGS data.
+- [ ] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
+- [ ] On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
+- [ ] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
+- [ ] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
+- [ ] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
 
 
-
-```{r echo=FALSE}
-phenos %>% select(TopMed_ID) %>% write_tsv("SARP.txt", col_names = FALSE)
-```
-.
