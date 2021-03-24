@@ -16,7 +16,7 @@ data_dir="/Volumes/Promise Pegasus/dbgap_downloads/78082/topmed-dcc/exchange/phs
 out_dir="/Volumes/Promise Pegasus/topmed_freeze8_phased_sarp/"
 
 minsize=100
-for chr in {1..22}; do
+for chr in {19,16,11,9,8,1}; do
   echo "Processing chromosome $chr ..."
   size=$(stat -f%z "${out_dir}/chr${chr}.vcf.gz")
 
