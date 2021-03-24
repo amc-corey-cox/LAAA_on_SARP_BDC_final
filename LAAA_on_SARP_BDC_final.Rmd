@@ -65,7 +65,7 @@ pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_c
     center = col_character()
   ))
 
-pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) ) %>% select(TopMed_ID)
+pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `SARP ethnic group` == "AA") %>% select(TopMed_ID)
 pheno_IDs %>% nrow
 pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
@@ -79,5 +79,4 @@ pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 - [ ] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
 - [ ] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
 - [ ] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
-
 
