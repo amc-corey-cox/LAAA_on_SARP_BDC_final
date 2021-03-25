@@ -8,19 +8,66 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(readxl)
+
+`%!in%` <- Negate(`%in%`)
 ```
 
 # SARP LAAA on BioDataCatalyst
 We'll be performing fine mapping using LAAA on BioDataCatalyst for SARP admixture reruns for the over 12 participants in SARP1/2 + CSGA.
 
-### Data files
-* `Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv`
-  - Complete "locked" phenotype file for SARP 1/2,  CSGA and SARP 3
-  - Originally from Complete SARP CSGA 3-4-21 cut.xlsx
-  - Received from Victory Ortega 4-Mar-2021
-  - Cleanup and select variables with clean_Complete_SARP_CSGA_pheno.R
+## Data Locations and Info
+Locations for phenotype file, imputed vcf's, wgs vcf's, and original SARP local ancestry.
 
-### Data Locations
+### Phenotype file
+* `Complete SARP CSGA 3-4-21 cut.xlsx`
+  - Complete "locked" phenotype file for SARP 1/2,  CSGA and SARP 3
+  - Received from Victory Ortega 4-Mar-2021
+  - Cleanup and select variables and re-write to `Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv`
+
+```{r cleanup_pheno, echo=FALSE}
+raw_phenos <- "~/Documents/Ortega/input_admixture_mapping/Complete SARP CSGA 3-4-21 cut.xlsx" %>% read_excel()
+
+phenos <- raw_phenos %>%
+  select(`ID SARP1-2 preferred`, `analysis_set (sarp1-2/csga = 1, SARP3 = 2)`, SARP_CSGA_genetics1_FID, TopMed_ID, `Study group`,
+         SITE, `Clinical Center`, `ALL COHORT Based on COMBINED Analysis`, `ASTHMA (2=yes, 1 = no)`, `RACE ( AA=1,CC=2,HS=3,Oth=4)`,
+         `SARP ethnic group`, SEX, `AGE>=12`, `AGE (csga-SARP12 default. Yellow SARP3)`, `HT (csga-SARP12 default. Yellow SARP3)`,
+         `BMI(csga-SARP12 default. Yellow SARP3)`, `ALL bFEV1`, `ALL bFVC`, `FEV1-FVC ratio (SARP3/yellow derived)`, `ALL MaxFEV1`,
+         `ALL MaxFVC`, `ALL MaxRatio`, `ALL MaxREV...137`, `ALL pdifffev1 (SARP1-2 CSGA only)`, `ALL MaxREV...243`, `puffs to max`,
+         SARP_CSGA_genetics1_FID) %>%
+  mutate(group = `Study group`,
+         Clinical.Center = `Clinical Center`,
+         ASTHMA..2.yes..1...no. = `ASTHMA (2=yes, 1 = no)`,
+         sarp12_csga_age = `AGE (csga-SARP12 default. Yellow SARP3)`,
+         sarp12_csga_HTcm = `HT (csga-SARP12 default. Yellow SARP3)`,
+         sarp12_csga_bmi = `BMI(csga-SARP12 default. Yellow SARP3)`,
+         Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir = `ALL pdifffev1 (SARP1-2 CSGA only)`,
+         sarp12_csga_bFEV1 = `ALL bFEV1`,
+         sarp12_csga_bFVC = `ALL bFVC`,
+         Maximum.FEV1..liters..Spirometry...maxBD = `ALL MaxFEV1`,
+         Maximum.FVC..liters..Spirometry...maxBD = `ALL MaxFVC`,
+         maxREVbeth = `ALL MaxREV...137`,
+         puffs.to.max = `puffs to max`) %>%
+  mutate(id = `ID SARP1-2 preferred`,
+         center = `Clinical Center`,
+         asthma = `ASTHMA (2=yes, 1 = no)`,
+         height = `HT (csga-SARP12 default. Yellow SARP3)`,
+         bmi = `BMI(csga-SARP12 default. Yellow SARP3)`,
+         `2_puffs_albuterol_FEV1_percBD` = `ALL pdifffev1 (SARP1-2 CSGA only)`, # Ask Victor
+         FEV1 = `ALL bFEV1`,
+         FVC = `ALL bFVC`,
+         FEV1_FVC_ratio = `FEV1-FVC ratio (SARP3/yellow derived)`,
+         maxFEV1 = `ALL MaxFEV1`,
+         maxFVC = `ALL MaxFVC`,
+         maxFEV1_reversal = `ALL MaxREV...137`)
+
+# phenos %>% filter(`ALL MaxREV...137` != `ALL MaxREV...243`) ## `ALL MaxREV` in two location, both are equal.
+
+phenos%>% write_tsv("~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv")
+```
+
+
+### Local Ancestry and Variant Files
 * BioDataCatalyst: SARP_chip_local_ancestry
   - Local ancestry already run on chr1, 8, 12
 * Imputed: Pegasus- "/Volumes/Promise Pegasus/gitlab/ORTEGA/csga_imputation/data/output"
@@ -34,7 +81,7 @@ We'll be performing fine mapping using LAAA on BioDataCatalyst for SARP admixtur
   - extract filename: chr${chr}.vcf.gz
   - rextract with current IDs
 
-### Other notes
+## Other notes
 CSGA+SARP12 is the discovery data set and we are aiming to identify allele dose associations in the discovery data set, which we will assess replication for using the SARP3 WGS data. For BARD, we used P < 0.001 to bring forward SNPs for replication. This should be OK, but if it asked for by a reviewer, the BDC app calc_nr_indep_snps can be used to estimate the number of independent variants in a peak, and then the P-value cut-off would be 0.05/nr_indep_snps.
 
 Chromosomes identified from SARP_admixture_rerun_no_under12:
