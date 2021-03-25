@@ -1,5 +1,7 @@
 # Pheno and data files
 SARP.txt
+imputed_vcf_header.txt
+wgs_vcf_header.txt
 
 # History files
 .Rhistory
