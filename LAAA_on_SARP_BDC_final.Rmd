@@ -11,6 +11,7 @@ library(tidyverse)
 library(readxl)
 
 `%!in%` <- Negate(`%in%`)
+duplicated.all <- function(x) { duplicated(x) | duplicated(x, fromLast = TRUE) }
 ```
 
 # SARP LAAA on BioDataCatalyst
@@ -94,7 +95,6 @@ chr1, chr8, chr9, chr11, chr16, chr19
 * maxFEV1_reversal: chr9, chr19
 * maxFVC: chr8
 
-
 ```{r get_SARP_IDs}
 pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv" %>%
   read_tsv(col_types = cols(
@@ -112,15 +112,54 @@ pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_c
     center = col_character()
   ))
 
-pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `SARP ethnic group` == "AA") %>% select(TopMed_ID)
+pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `RACE ( AA=1,CC=2,HS=3,Oth=4)` == 1) %>% select(TopMed_ID)
 pheno_IDs %>% nrow
 pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
 
 #### Checklist
-
 - [ ] Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
 - [ ] Create phenotype files with outcomes and covariates needed to fine-map any significant admixture mapping peaks - create separate phenotype files for imputed data, SARP12 samples with WGS data, SARP3 samples with WGS data.
+
+```{sh, eval=FALSE}
+# Run on Pegasus and sftp to local.
+# Get vcf header from imputed data for phenotype subsetting
+gzcat chr19.dose.vcf.gz | head -n 20 | grep "#CHROM" > imputed_vcf_header.txt
+
+# Get vcf header from wgs data for phenotype subsetting
+gzcat chr19.vcf.gz | head -n 20 | grep "#CHROM" > wgs_vcf_header.txt
+```
+
+```{r create_phenos}
+vcf_lead <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT")
+
+select_pheno <- phenos %>%
+  select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", age = "sarp12_csga_age", sex = "SEX", group,
+    race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center", height_cm = "sarp12_csga_HTcm",
+    base_fev1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
+    two_puff_FEV1 = "Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir",
+    FVC = "sarp12_csga_bFVC", maxFEV1 = "Maximum.FEV1..liters..Spirometry...maxBD",
+    max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD")
+
+imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
+  magrittr::extract(. %!in% vcf_lead) %>% str_extract("^[:digit:]*")
+
+imputed_phenos <- select_pheno %>%
+  filter(FID %in% imputed_IDs, race == 1)
+
+imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping.txt")
+
+wgs_IDs <- "wgs_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
+  magrittr::extract(. %!in% vcf_lead)
+
+wgs_phenos <- select_pheno %>% filter(TopMed_ID %in% wgs_IDs & ! duplicated(TopMed_ID))
+
+SARP1.2_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP1-2")
+SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping.txt")
+SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
+SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping.txt")
+```
+
 - [ ] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
 - [ ] On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
 - [ ] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
