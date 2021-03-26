@@ -134,8 +134,8 @@ gzcat chr19.vcf.gz | head -n 20 | grep "#CHROM" > wgs_vcf_header.txt
 vcf_lead <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT")
 
 select_pheno <- phenos %>%
-  select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", age = "sarp12_csga_age", sex = "SEX", group,
-    race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center", height_cm = "sarp12_csga_HTcm",
+  select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", age = "sarp12_csga_age", sex = "SEX", BMI = "sarp12_csga_bmi",
+    group, race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center", height_cm = "sarp12_csga_HTcm",
     base_fev1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
     two_puff_FEV1 = "Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir",
     FVC = "sarp12_csga_bFVC", maxFEV1 = "Maximum.FEV1..liters..Spirometry...maxBD",
