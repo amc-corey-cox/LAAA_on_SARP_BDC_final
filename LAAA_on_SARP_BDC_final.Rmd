@@ -118,8 +118,8 @@ pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
 
 #### Checklist
-- [ ] Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
-- [ ] Create phenotype files with outcomes and covariates needed to fine-map any significant admixture mapping peaks - create separate phenotype files for imputed data, SARP12 samples with WGS data, SARP3 samples with WGS data.
+- [ ] . Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
+- [X] Create phenotype files with outcomes and covariates needed to fine-map any significant admixture mapping peaks - create separate phenotype files for imputed data, SARP12 samples with WGS data, SARP3 samples with WGS data.
 
 ```{sh, eval=FALSE}
 # Run on Pegasus and sftp to local.
@@ -136,7 +136,7 @@ vcf_lead <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FO
 select_pheno <- phenos %>%
   select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", age = "sarp12_csga_age", sex = "SEX", BMI = "sarp12_csga_bmi",
     group, race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center", height_cm = "sarp12_csga_HTcm",
-    base_fev1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
+    base_FEV1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
     two_puff_FEV1 = "Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir",
     FVC = "sarp12_csga_bFVC", maxFEV1 = "Maximum.FEV1..liters..Spirometry...maxBD",
     max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD")
@@ -160,8 +160,8 @@ SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
 SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping.txt")
 ```
 
-- [ ] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
-- [ ] On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
+- [X] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
+- [ ] . On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
 - [ ] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
 - [ ] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
 - [ ] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
