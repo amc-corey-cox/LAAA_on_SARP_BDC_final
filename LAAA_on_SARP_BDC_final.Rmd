@@ -142,17 +142,23 @@ select_pheno <- phenos %>%
     max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD")
 
 imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
-  magrittr::extract(. %!in% vcf_lead) %>% str_extract("^[:digit:]*")
+  magrittr::extract(. %!in% vcf_lead) %>%
+  str_replace_all(":", ".") %>% str_c("X", .) %>%
+  tibble %>% set_names("sample_id") %>%
+  mutate(FID = sample_id %>% str_extract("(?<=X)[:digit:]*") %>% as.double)
 
 imputed_phenos <- select_pheno %>%
-  filter(FID %in% imputed_IDs, race == 1)
+  right_join(imputed_IDs, by = "FID")
+  # filter(FID %in% imputed_IDs, race == 1)
 
 imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping.txt")
 
 wgs_IDs <- "wgs_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
   magrittr::extract(. %!in% vcf_lead)
 
-wgs_phenos <- select_pheno %>% filter(TopMed_ID %in% wgs_IDs & ! duplicated(TopMed_ID))
+wgs_phenos <- select_pheno %>%
+  filter(TopMed_ID %in% wgs_IDs & ! duplicated(TopMed_ID)) %>%
+  select(sample_id = TopMed_ID, everything())
 
 SARP1.2_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP1-2")
 SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping.txt")
