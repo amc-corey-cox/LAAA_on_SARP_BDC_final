@@ -172,3 +172,42 @@ SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping.txt")
 - [ ] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
 - [ ] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
 
+
+```{r meta_analysis}
+getCombinedBeta <- function(betas, std.errs) {
+  weights <- 1/((std.errs)^2)
+  beta <- (sum(betas*weights))/(sum(weights))
+  return (beta)
+}
+
+getCombinedStdErr <- function(std.errs) {
+  weights <- 1/((std.errs)^2)
+  se <- sqrt(1/(sum(weights)))
+  return (se)
+}
+
+getP <- function(beta, se) {
+  return (1-pnorm(abs(beta/se)))*2
+}
+
+getORStr <- function(beta, se) {
+  return ( paste0(formatC(beta, 3, format="f"), 
+                  " [", formatC(beta-1.96*se, 3, format="f"), 
+                  "-", formatC(beta+1.96*se, 3, format="f"), "]") )
+}
+
+imputed_laaa_results <- read_tsv("results/laaa_chr19_imputed_maxFEV1_reversal_laaa.txt")
+wgs_laaa_results <- read_tsv("results/laaa_chr19_wgs_maxFEV1_reversal_laaa.txt")
+
+meta_laaa_results <- imputed_laaa_results %>%
+  inner_join(wgs_laaa_results, by = c("position", "ref", "alt"), suffix = c("_imputed", "_wgs")) %>%
+  select(position, ref, alt, contains(c("alt_freq", "n_", "un", "beta"))) %>%
+# Have to use rowwise because of how the variables are grouped.
+  rowwise %>%
+  mutate(meta_afr_dose_beta = getCombinedBeta(c(afr_dose_beta_imputed, afr_dose_beta_wgs), c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs)),
+         meta_afr_dose_se = getCombinedStdErr(c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs)),
+         meta_afr_does_p = getP(meta_afr_dose_beta, meta_afr_dose_se),
+         # meta_afr_dose_OR = getORStr(meta_afr_dose_beta, meta_afr_dose_se),
+         .keep = "unused")
+```
+
