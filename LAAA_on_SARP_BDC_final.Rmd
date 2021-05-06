@@ -166,7 +166,7 @@ imputed_phenos <- select_pheno %>%
 imputed_phenos %>%
   mutate(FID = sample_id) %>%
   select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
-  write_tsv("SARP1_2_imputed_phenos_2_plink.txt")
+  write_tsv("SARP1_2_imputed_phenos_mapping_2.txt")
 
 imputed_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
