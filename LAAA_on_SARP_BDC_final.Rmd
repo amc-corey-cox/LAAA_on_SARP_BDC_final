@@ -2,13 +2,19 @@
 title: "LAAA on SARP BDC"
 author: "Corey Cox"
 date: "3/22/2021"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
+library(knitr)
+library(DT)
+library(table1)
+library(kableExtra)
 
 `%!in%` <- Negate(`%in%`)
 duplicated.all <- function(x) { duplicated(x) | duplicated(x, fromLast = TRUE) }
@@ -26,7 +32,7 @@ Locations for phenotype file, imputed vcf's, wgs vcf's, and original SARP local 
   - Received from Victory Ortega 4-Mar-2021
   - Cleanup and select variables and re-write to `Complete_SARP_CSGA_3-4-21_cut.adjusted.20200308.tsv`
 
-```{r cleanup_pheno, echo=FALSE}
+```{r cleanup_pheno, echo=FALSE, warning=FALSE, message=FALSE}
 raw_phenos <- "~/Documents/Ortega/input_admixture_mapping/Complete SARP CSGA 3-4-21 cut.xlsx" %>% read_excel()
 
 phenos <- raw_phenos %>%
@@ -90,7 +96,7 @@ chr1, chr8, chr9, chr11, chr16, chr19
 
 * 2-puffs_albuterol... : chr11
 * FEV1: none
-* FVC: chr16
+* FVC: chr16, chr13
 * maxFEV1: chr1
 * maxFEV1_reversal: chr9, chr19
 * maxFVC: chr8
@@ -112,13 +118,17 @@ pheno <- "~/Documents/Ortega/input_admixture_mapping/Complete_SARP_CSGA_3-4-21_c
     center = col_character()
   ))
 
-pheno_IDs <- pheno %>% filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `RACE ( AA=1,CC=2,HS=3,Oth=4)` == 1) %>% select(TopMed_ID)
+pheno_IDs <- pheno %>%
+  # Filter by ASTHMA later...
+  # filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `ASTHMA (2=yes, 1 = no)` == 2 & `RACE ( AA=1,CC=2,HS=3,Oth=4)` == 1) %>%
+  filter(! is.na(TopMed_ID) & ! duplicated(TopMed_ID) & `RACE ( AA=1,CC=2,HS=3,Oth=4)` == 1) %>%
+  select(TopMed_ID)
 pheno_IDs %>% nrow
 pheno_IDs %>% write_tsv("SARP.txt", col_names = FALSE)
 ```
 
 #### Checklist
-- [ ] . Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
+- [X] Identify which chromosomes have admixture mapping peaks for any of the phenotypes, and run RFMix for them on BDC using the  rfmix_afr_eur_imp_wf in the ORTEGA_shared_apps project (see notes above on file locations).
 - [X] Create phenotype files with outcomes and covariates needed to fine-map any significant admixture mapping peaks - create separate phenotype files for imputed data, SARP12 samples with WGS data, SARP3 samples with WGS data.
 
 ```{sh, eval=FALSE}
@@ -134,35 +144,333 @@ gzcat chr19.vcf.gz | head -n 20 | grep "#CHROM" > wgs_vcf_header.txt
 vcf_lead <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT")
 
 select_pheno <- phenos %>%
-  select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", age = "sarp12_csga_age", sex = "SEX", BMI = "sarp12_csga_bmi",
-    group, race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center", height_cm = "sarp12_csga_HTcm",
-    base_FEV1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
+  select(TopMed_ID, FID = "SARP_CSGA_genetics1_FID", asthma = `ASTHMA (2=yes, 1 = no)`, age = "sarp12_csga_age",
+    sex = "SEX", BMI = "sarp12_csga_bmi", group, race = "RACE ( AA=1,CC=2,HS=3,Oth=4)", center = "Clinical.Center",
+    height_cm = "sarp12_csga_HTcm", base_FEV1 = "sarp12_csga_bFEV1", cohort = "ALL COHORT Based on COMBINED Analysis",
     two_puff_FEV1 = "Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir",
     FVC = "sarp12_csga_bFVC", maxFEV1 = "Maximum.FEV1..liters..Spirometry...maxBD",
-    max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD")
+    max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD") %>%
+  filter(asthma == 2)
 
 imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
-  magrittr::extract(. %!in% vcf_lead) %>% str_extract("^[:digit:]*")
+  magrittr::extract(. %!in% vcf_lead) %>%
+  # str_replace_all(":", ".") %>% str_c("X", .) %>%
+  tibble %>% set_names("sample_id") %>%
+  # mutate(FID = sample_id %>% str_extract("(?<=X)[:digit:]*") %>% as.double)
+  mutate(FID = sample_id %>% str_extract("^[:digit:]*") %>% as.double)
 
 imputed_phenos <- select_pheno %>%
-  filter(FID %in% imputed_IDs, race == 1)
+  inner_join(imputed_IDs, by = "FID")
+  # filter(FID %in% imputed_IDs, race == 1)
 
-imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping.txt")
+imputed_phenos %>%
+  mutate(FID = sample_id) %>%
+  select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
+  write_tsv("SARP1_2_imputed_phenos_2_plink.txt")
+
+imputed_phenos %>%
+  mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
+         Asthma = recode(asthma, `2` = "Case"), 
+         Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
+  table1(~ Age + Sex + BMI + Race + height_cm + Asthma + base_FEV1 + maxFEV1 + max_fev1_reversal +
+           two_puff_FEV1 + FVC + maxFVC | cohort,
+         data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 1-2 Imputed Demographics and Phenotypes</p>')
 
 wgs_IDs <- "wgs_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
   magrittr::extract(. %!in% vcf_lead)
 
-wgs_phenos <- select_pheno %>% filter(TopMed_ID %in% wgs_IDs & ! duplicated(TopMed_ID))
+wgs_phenos <- select_pheno %>%
+  filter(TopMed_ID %in% wgs_IDs & ! duplicated(TopMed_ID)) %>%
+  select(sample_id = TopMed_ID, everything())
 
 SARP1.2_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP1-2")
+
+SARP1.2_wgs_phenos %>%
+  mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
+         Asthma = recode(asthma, `2` = "Case"), 
+         Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
+  table1(~ Age + Sex + BMI + Race + height_cm + Asthma + base_FEV1 + maxFEV1 + max_fev1_reversal +
+           two_puff_FEV1 + FVC + maxFVC | cohort,
+         data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 1-2 WGS Demographics and Phenotypes</p>')
+
 SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping.txt")
+
 SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
+
+SARP3_wgs_phenos %>%
+  mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
+         Asthma = recode(asthma, `2` = "Case"), 
+         Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
+  table1(~ Age + Sex + BMI + Race + height_cm + Asthma + base_FEV1 + maxFEV1 + max_fev1_reversal +
+           two_puff_FEV1 + FVC + maxFVC | cohort,
+         data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 3 WGS Demographics and Phenotypes</p>')
+
 SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping.txt")
+
+intersect(imputed_phenos$TopMed_ID, SARP1.2_wgs_phenos$sample_id)
 ```
 
 - [X] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
-- [ ] . On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
-- [ ] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
-- [ ] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
-- [ ] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
+- [X] On BDC, run the laaa task copied from the ORTEGA_shared_apps project for each peak to fine-map, separately for imputed data, SARP12 WGS data, SARP3 WGS data
+- [X] Combine the chip and SARP12 WGS laaa results using inverse-variance meta-analysis, for each beta, SE and P (so for allele_dose, allele_afr_dose, allele_afr_dose) - output data in a similar format as the laaa results file, so this can be used as input for locus zoom. The attached meta-analysis.R script is an analogous scenario for combining ADRN QT results for MEGA and WGS data
+- [X] On BDC, use the laaa_locus_zoom task  copied from the ORTEGA_shared_apps project to run locus zoom for CSGA+SARP12 imputed +WGS data, and SARP3 WGS data
+- [X] Identify SNPs in the CSGA+SARP12 imputed +WGS data with allele dose P < 0.001, and assess replication in SARP3 WGS data (P < 0.05, same effect direction)
 
+
+```{r meta_analysis,  message=FALSE}
+getCombinedBeta <- function(betas, std.errs) {
+  weights <- 1/((std.errs)^2)
+  beta <- (sum(betas*weights))/(sum(weights))
+  return (beta)
+}
+
+getCombinedStdErr <- function(std.errs) {
+  weights <- 1/((std.errs)^2)
+  se <- sqrt(1/(sum(weights)))
+  return (se)
+}
+
+getP <- function(beta, se) {
+  return (1-pnorm(abs(beta/se)))*2
+}
+
+getPstr <- function(p) {
+  return ( formatC(p, 3, format="f" ))
+}
+
+getORStr <- function(beta, se) {
+  return ( paste0(formatC(beta, 3, format="f"), 
+                  " [", formatC(beta-1.96*se, 3, format="f"), 
+                  "-", formatC(beta+1.96*se, 3, format="f"), "]") )
+}
+
+get_meta_results <- function(.x, .y) {
+  .x %>%
+  inner_join(.y, by = c("position", "ref", "alt"), suffix = c("_imputed", "_wgs")) %>%
+  select(position, ref, alt, contains(c("alt_frq", "n_", "un", "beta"))) %>%
+# Have to use rowwise because of how the variables are grouped.
+  rowwise %>%
+  mutate(.keep = "unused",
+    meta_allele_dose_beta = getCombinedBeta(
+      c(allele_dose_beta_imputed, allele_dose_beta_wgs), c(allele_dose_beta_se_imputed, allele_dose_beta_se_wgs)),
+    meta_allele_dose_se = getCombinedStdErr(c(allele_dose_beta_se_imputed, allele_dose_beta_se_wgs)),
+    meta_allele_dose_p = getP(meta_allele_dose_beta, meta_allele_dose_se),
+    meta_allele_dose_OR = getORStr(meta_allele_dose_beta, meta_allele_dose_se),
+    
+    meta_afr_dose_beta = getCombinedBeta(
+      c(afr_dose_beta_imputed, afr_dose_beta_wgs), c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs)),
+    meta_afr_dose_se = getCombinedStdErr(c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs)),
+    meta_afr_dose_p = getP(meta_afr_dose_beta, meta_afr_dose_se),
+    meta_afr_dose_OR = getORStr(meta_afr_dose_beta, meta_afr_dose_se),
+    
+    meta_allele_afr_dose_beta = getCombinedBeta(
+      c(allele_afr_dose_beta_imputed, allele_afr_dose_beta_wgs), c(allele_afr_dose_beta_se_imputed, allele_afr_dose_beta_se_wgs)),
+    meta_allele_afr_dose_se = getCombinedStdErr(c(allele_afr_dose_beta_se_imputed, allele_afr_dose_beta_se_wgs)),
+    meta_allele_afr_dose_p = getP(meta_allele_afr_dose_beta, meta_allele_afr_dose_se),
+    meta_allele_afr_dose_p_str = getPstr(meta_allele_afr_dose_p),
+    meta_allele_afr_dose_OR = getORStr(meta_allele_afr_dose_beta, meta_allele_afr_dose_se))
+}
+
+meta_SARP1_2 <- lst(
+  maxFEV1_reversal = lst(
+    chr19 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_wgs_maxFEV1_reversal_laaa.txt")),
+    chr9 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_wgs_maxFEV1_reversal_laaa.txt"))),
+  FVC = lst(
+    chr16 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_wgs_FVC_laaa.txt")),
+    chr13 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_wgs_FVC_laaa.txt"))),
+  `2puffs` = lst(
+    chr11 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_imputed_2puffs_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_wgs_2puff_laaa.txt"))),
+  maxFVC = lst(
+    chr8 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_imputed_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_wgs_maxFVC_laaa.txt")),
+    chr1 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_imputed_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_wgs_maxFEV1_laaa.txt"))))
+
+meta_SARP1_2_combined <- meta_SARP1_2 %>%
+  map( ~ imap(., ~ mutate(.x, chr = .y, .before = 1))) %>%
+  map(bind_rows) %>%
+  imap( ~ mutate(.x, phenotype = .y, .before = 1)) %>%
+  reduce(bind_rows) %>%
+  mutate(chr_pos = str_c(chr, position, sep = ":"))
+
+```
+
+```{r}
+get_all_meta_results <- function(.x, .y, .z) {
+  .x %>%
+    inner_join(.y, by = c("position", "ref", "alt"), suffix = c("_imputed", "_wgs")) %>%
+    inner_join(.z, by = c("position", "ref", "alt")) %>%
+    select(position, ref, alt, contains(c("alt_frq", "n_", "un", "beta"))) %>%
+    # Have to use rowwise because of how the variables are grouped.
+    rowwise %>%
+    mutate(.keep = "unused",
+           meta_allele_dose_beta = getCombinedBeta(
+             c(allele_dose_beta_imputed, allele_dose_beta_wgs, allele_dose_beta),
+             c(allele_dose_beta_se_imputed, allele_dose_beta_se_wgs, allele_dose_beta_se)),
+           meta_allele_dose_se = getCombinedStdErr(
+             c(allele_dose_beta_se_imputed, allele_dose_beta_se_wgs, allele_dose_beta_se)),
+           meta_allele_dose_p = getP(meta_allele_dose_beta, meta_allele_dose_se),
+           meta_allele_dose_OR = getORStr(meta_allele_dose_beta, meta_allele_dose_se),
+
+           meta_afr_dose_beta = getCombinedBeta(
+             c(afr_dose_beta_imputed, afr_dose_beta_wgs, afr_dose_beta),
+             c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs, afr_dose_beta_se)),
+           meta_afr_dose_se = getCombinedStdErr(
+             c(afr_dose_beta_se_imputed, afr_dose_beta_se_wgs, afr_dose_beta_se)),
+           meta_afr_dose_p = getP(meta_afr_dose_beta, meta_afr_dose_se),
+           meta_afr_dose_OR = getORStr(meta_afr_dose_beta, meta_afr_dose_se),
+
+           meta_allele_afr_dose_beta = getCombinedBeta(
+             c(allele_afr_dose_beta_imputed, allele_afr_dose_beta_wgs, allele_afr_dose_beta),
+             c(allele_afr_dose_beta_se_imputed, allele_afr_dose_beta_se_wgs, allele_afr_dose_beta_se)),
+           meta_allele_afr_dose_se = getCombinedStdErr(
+             c(allele_afr_dose_beta_se_imputed, allele_afr_dose_beta_se_wgs, allele_afr_dose_beta_se)),
+           meta_allele_afr_dose_p = getP(meta_allele_afr_dose_beta, meta_allele_afr_dose_se),
+           meta_allele_afr_dose_p_str = getPstr(meta_allele_afr_dose_p),
+           meta_allele_afr_dose_OR = getORStr(meta_allele_afr_dose_beta, meta_allele_afr_dose_se))
+}
+
+meta_SARP1_2_3 <- lst(
+  maxFEV1_reversal = lst(
+    chr19 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_wgs_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr19_wgs_maxFEV1_reversal_laaa.txt")),
+    chr9 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_wgs_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr9_wgs_maxFEV1_reversal_laaa.txt"))),
+  FVC = lst(
+    chr16 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_wgs_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr16_wgs_FVC_laaa.txt")),
+    chr13 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_wgs_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr13_wgs_FVC_laaa.txt"))),
+  # `2puffs` = lst(
+  #   chr11 = get_meta_results(
+  #     read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_imputed_2puffs_laaa.txt"),
+  #     read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_wgs_2puff_laaa.txt"))),
+  maxFVC = lst(
+    chr8 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_imputed_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_wgs_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr8_wgs_maxFVC_laaa.txt")),
+    chr1 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_imputed_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_wgs_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr1_wgs_maxFEV1_laaa.txt"))))
+
+meta_SARP1_2_3_combined <- meta_SARP1_2_3 %>%
+  map( ~ imap(., ~ mutate(.x, chr = .y, .before = 1))) %>%
+  map(bind_rows) %>%
+  imap( ~ mutate(.x, phenotype = .y, .before = 1)) %>%
+  reduce(bind_rows) %>%
+  mutate(chr_pos = str_c(chr, position, sep = ":"))
+```
+
+
+
+```{r meta_analysis_hits}
+all_hits_allele <- meta_SARP1_2_combined %>%
+  filter(meta_allele_dose_p < 0.001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_allele %>% 
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose OR` = meta_allele_afr_dose_OR,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.001")
+
+all_hits_afr <- meta_SARP1_2_combined %>%
+  filter(meta_afr_dose_p < 0.0001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_afr %>%
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Afr dose OR` = meta_afr_dose_OR,
+         `META Afr dose p` = meta_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Afr dose p < 0.0001")
+
+all_hits_allele_afr <- meta_SARP1_2_combined %>%
+  filter(meta_allele_afr_dose_p < 0.001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_allele_afr %>% 
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose OR` = meta_allele_afr_dose_OR,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele Afr dose < 0.001")
+```
+
+```{r}
+all_hits_allele_sarp_1_2_3 <- meta_SARP1_2_3_combined %>%
+  filter(meta_allele_dose_p < 0.0001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+
+meta_SARP1_2_combined %>%
+  filter(position %in% all_hits_allele_sarp_1_2_3$position) %>%
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose beta` = meta_allele_dose_beta,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose beta` = meta_allele_afr_dose_beta,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.001")
+
+all_hits_allele_sarp_1_2_3 %>% 
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose beta` = meta_allele_dose_beta,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose beta` = meta_allele_afr_dose_beta,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.0001")
+```
+
+
+
+```{r, replication, message=FALSE}
+SARP3_list <- lst(
+  SARP3_maxFEV1_reversal_chr9 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr9_wgs_maxFEV1_reversal_laaa.txt"),
+  SARP3_maxFEV1_reversal_chr19 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr19_wgs_maxFEV1_reversal_laaa.txt"),
+  SARP3_FVC_chr13 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr13_wgs_FVC_laaa.txt"),
+  SARP3_FVC_chr16 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr16_wgs_FVC_laaa.txt"),
+  SARP3_maxFVC_chr8 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr8_wgs_maxFVC_laaa.txt"),
+  SARP3_maxFEV1_chr1 = read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr1_wgs_maxFEV1_laaa.txt"))
+
+SARP3_results <- SARP3_list %>%
+  imap(~ mutate(.x, chr = str_extract(.y, pattern = "chr[:digit:]*"),
+                chr_pos = str_c(chr, position, sep = ":"))) %>%
+  reduce(bind_rows) %>%
+  mutate(allele_afr_dose_OR = getORStr(allele_afr_dose_beta, allele_afr_dose_beta_se))
+
+SARP3_SARP1_2_hits_allele <- SARP3_results %>%
+  right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
+# SARP3_allele_replication <- SARP3_SARP1_2_hits_allele %>%
+#   filter(allele_dose_p < 0.05)
+# SARP3_allele_replication %>% kable
+
+SARP3_SARP1_2_hits_afr <- SARP3_results %>%
+  right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
+# SARP3_afr_replication <- SARP3_SARP1_2_hits_afr %>%
+#   filter(afr_dose_p < 0.05)
+# SARP3_afr_replication %>% kable
+
+SARP3_SARP1_2_hits_allele_afr <- SARP3_results %>%
+  right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
+SARP3_allele_afr_replication <- SARP3_SARP1_2_hits_allele_afr %>%
+  filter(allele_afr_dose_p < 0.05)
+# SARP3_allele_afr_replication %>% datatable(options = list(dom = 't'))
+SARP3_allele_afr_replication %>% kable
+```

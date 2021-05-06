@@ -3,6 +3,8 @@ SARP.txt
 imputed_vcf_header.txt
 wgs_vcf_header.txt
 SARP1_2_imputed_phenos_mapping.txt
+SARP1_2_imputed_phenos_plink.txt
+SARP1_2_imputed_phenos_2_plink.txt
 SARP1_2_wgs_phenos_mapping.txt
 SARP3_wgs_phenos_mapping.txt
 results/
