@@ -140,7 +140,7 @@ gzcat chr19.dose.vcf.gz | head -n 20 | grep "#CHROM" > imputed_vcf_header.txt
 gzcat chr19.vcf.gz | head -n 20 | grep "#CHROM" > wgs_vcf_header.txt
 ```
 
-```{r create_phenos}
+```{r create_phenos, message=FALSE}
 vcf_lead <- c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT")
 
 select_pheno <- phenos %>%
@@ -150,7 +150,7 @@ select_pheno <- phenos %>%
     two_puff_FEV1 = "Percent.difference.in.FEV1.after.2.puffs.albuterol..q.17g...Spir",
     FVC = "sarp12_csga_bFVC", maxFEV1 = "Maximum.FEV1..liters..Spirometry...maxBD",
     max_fev1_reversal = "maxREVbeth", maxFVC = "Maximum.FVC..liters..Spirometry...maxBD") %>%
-  filter(asthma == 2)
+  filter(asthma == 2, age >= 12)
 
 imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
   magrittr::extract(. %!in% vcf_lead) %>%
@@ -161,26 +161,13 @@ imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% f
 
 imputed_phenos <- select_pheno %>%
   inner_join(imputed_IDs, by = "FID")
-  # filter(FID %in% imputed_IDs, race == 1)
 
-# imputed_phenos %>%
-#   mutate(FID = sample_id) %>%
-#   select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
-#   write_tsv("SARP1_2_imputed_phenos_plink.txt")
+imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping_over12.txt")
 
-imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping_2.txt")
-
-# imputed_phenos_tmp <- imputed_phenos %>% select(-asthma)
-# imputed_phenos %>% 
-#   mutate(across(where(is.character), as_factor)) %>%
-#   summary
-# 
-# imputed_phenos_old <- read_tsv("SARP1_2_imputed_phenos_mapping.txt")
-# imputed_phenos_old <- imputed_phenos_old %>% head(193)
-# imputed_phenos_old %>% write_tsv("SARP1_2_imputed_phenos_mapping_test.txt")
-# 
-# imputed_phenos_old %>%
-#   filter(age >= 12) %>% write_tsv("SARP1_2_imputed_phenos_mapping_test.txt")
+imputed_phenos %>%
+  mutate(FID = sample_id) %>%
+  select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
+  write_tsv("SARP1_2_imputed_phenos_plink.txt")
 
 t1_imputed_phenos <- imputed_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
@@ -198,6 +185,7 @@ wgs_phenos <- select_pheno %>%
   select(sample_id = TopMed_ID, everything())
 
 SARP1.2_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP1-2")
+SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping_over12.txt")
 
 SARP1.2_wgs_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
@@ -206,8 +194,6 @@ SARP1.2_wgs_phenos %>%
   table1(~ Age + Sex + BMI + Race + height_cm + Asthma + base_FEV1 + maxFEV1 + max_fev1_reversal +
            two_puff_FEV1 + FVC + maxFVC | cohort,
          data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 1-2 WGS Demographics and Phenotypes</p>')
-
-SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping.txt")
 
 SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
 
@@ -219,7 +205,7 @@ SARP3_wgs_phenos %>%
            two_puff_FEV1 + FVC + maxFVC | cohort,
          data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 3 WGS Demographics and Phenotypes</p>')
 
-SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping.txt")
+SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping_over12.txt")
 
 intersect(imputed_phenos$TopMed_ID, SARP1.2_wgs_phenos$sample_id)
 ```

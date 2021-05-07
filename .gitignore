@@ -1,12 +1,12 @@
 # Pheno and data files
 SARP.txt
-imputed_vcf_header.txt
-wgs_vcf_header.txt
-SARP1_2_imputed_phenos_mapping.txt
-SARP1_2_imputed_phenos_mapping_2.txt
-SARP1_2_wgs_phenos_mapping.txt
-SARP3_wgs_phenos_mapping.txt
-results/
+*_header.txt
+*_mapping.txt
+*_over12.txt
+*_plink.txt
+
+# Saved excel output files
+*.xlsx
 
 # History files
 .Rhistory
