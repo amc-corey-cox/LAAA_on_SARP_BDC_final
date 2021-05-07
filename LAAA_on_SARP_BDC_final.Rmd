@@ -321,7 +321,7 @@ meta_SARP1_2_combined <- meta_SARP1_2 %>%
 
 ```
 
-```{r}
+```{r meta_results, message=FALSE}
 get_all_meta_results <- function(.x, .y, .z) {
   .x %>%
     inner_join(.y, by = c("position", "ref", "alt"), suffix = c("_imputed", "_wgs")) %>%
@@ -471,9 +471,9 @@ SARP3_results <- SARP3_list %>%
 
 SARP3_SARP1_2_hits_allele <- SARP3_results %>%
   right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
-# SARP3_allele_replication <- SARP3_SARP1_2_hits_allele %>%
-#   filter(allele_dose_p < 0.05)
-# SARP3_allele_replication %>% kable
+SARP3_allele_replication <- SARP3_SARP1_2_hits_allele %>%
+  filter(allele_dose_p < 0.05)
+SARP3_allele_replication %>% kable
 
 SARP3_SARP1_2_hits_afr <- SARP3_results %>%
   right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
@@ -488,3 +488,152 @@ SARP3_allele_afr_replication <- SARP3_SARP1_2_hits_allele_afr %>%
 # SARP3_allele_afr_replication %>% datatable(options = list(dom = 't'))
 SARP3_allele_afr_replication %>% kable
 ```
+
+
+```{r rerun, message=FALSE}
+meta_SARP1_2_rerun <- lst(
+  maxFEV1_reversal = lst(
+    chr19 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr19_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_wgs_maxFEV1_reversal_laaa.txt")),
+    chr9 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/SARP1_2_chr9_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_wgs_maxFEV1_reversal_laaa.txt"))),
+  FVC = lst(
+    chr16 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr16_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_wgs_FVC_laaa.txt")),
+    chr13 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr13_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_wgs_FVC_laaa.txt"))),
+  `2puffs` = lst(
+    chr11 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr11_imputed_2puffs_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_wgs_2puff_laaa.txt"))),
+  maxFVC = lst(
+    chr8 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr8_imputed_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_wgs_maxFVC_laaa.txt")),
+    chr1 = get_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr1_imputed_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_wgs_maxFEV1_laaa.txt"))))
+
+meta_SARP1_2_combined_rerun <- meta_SARP1_2_rerun %>%
+  map( ~ imap(., ~ mutate(.x, chr = .y, .before = 1))) %>%
+  map(bind_rows) %>%
+  imap( ~ mutate(.x, phenotype = .y, .before = 1)) %>%
+  reduce(bind_rows) %>%
+  mutate(chr_pos = str_c(chr, position, sep = ":"))
+
+```
+
+```{r meta_analysis_hits_rerun}
+all_hits_allele_rerun <- meta_SARP1_2_combined_rerun %>%
+  filter(meta_allele_dose_p < 0.001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_allele_rerun %>% 
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose OR` = meta_allele_afr_dose_OR,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.001")
+
+all_hits_afr_rerun <- meta_SARP1_2_combined_rerun %>%
+  filter(meta_afr_dose_p < 0.0001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_afr_rerun %>%
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Afr dose OR` = meta_afr_dose_OR,
+         `META Afr dose p` = meta_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Afr dose p < 0.0001")
+
+all_hits_allele_afr_rerun <- meta_SARP1_2_combined_rerun %>%
+  filter(meta_allele_afr_dose_p < 0.001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+all_hits_allele_afr_rerun %>% 
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose OR` = meta_allele_dose_OR,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose OR` = meta_allele_afr_dose_OR,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele Afr dose < 0.001")
+
+
+SARP3_SARP1_2_hits_allele_rerun <- SARP3_results %>%
+  right_join(all_hits_allele, by = c("position", "ref", "alt", "chr_pos"))
+SARP3_allele_replication <- SARP3_SARP1_2_hits_allele_rerun %>%
+  filter(allele_dose_p < 0.1)
+SARP3_allele_replication %>% nrow
+```
+### Table with most significant in meta-analyses.
+
+
+### Replication in Whites (Non-hispanic) as well
+
+```{r all_meta_rerun, message=FALSE}
+meta_SARP1_2_3_rerun <- lst(
+  maxFEV1_reversal = lst(
+    chr19 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr19_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr19_wgs_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr19_wgs_maxFEV1_reversal_laaa.txt")),
+    chr9 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/SARP1_2_chr9_imputed_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr9_wgs_maxFEV1_reversal_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr9_wgs_maxFEV1_reversal_laaa.txt"))),
+  FVC = lst(
+    chr16 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr16_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr16_wgs_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr16_wgs_FVC_laaa.txt")),
+    chr13 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr13_imputed_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr13_wgs_FVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr13_wgs_FVC_laaa.txt"))),
+  # `2puffs` = lst(
+  #   chr11 = get_meta_results(
+  #     read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_imputed_2puffs_laaa.txt"),
+  #     read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr11_wgs_2puff_laaa.txt"))),
+  maxFVC = lst(
+    chr8 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr8_imputed_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr8_wgs_maxFVC_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr8_wgs_maxFVC_laaa.txt")),
+    chr1 = get_all_meta_results(
+      read_tsv("~/Documents/Ortega/LAAA_results_2/laaa_chr1_imputed_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP1_2_chr1_wgs_maxFEV1_laaa.txt"),
+      read_tsv("~/Documents/Ortega/LAAA_results/SARP3_chr1_wgs_maxFEV1_laaa.txt"))))
+
+meta_SARP1_2_3_combined_rerun <- meta_SARP1_2_3_rerun %>%
+  map( ~ imap(., ~ mutate(.x, chr = .y, .before = 1))) %>%
+  map(bind_rows) %>%
+  imap( ~ mutate(.x, phenotype = .y, .before = 1)) %>%
+  reduce(bind_rows) %>%
+  mutate(chr_pos = str_c(chr, position, sep = ":"))
+```
+
+```{r all_meta_hits, message = FALSE}
+all_hits_allele_sarp_1_2_3_rerun <- meta_SARP1_2_3_combined_rerun %>%
+  filter(meta_allele_dose_p < 0.001) %>%
+  select(1:5, contains(c("alt", "n_", "meta")), chr_pos)
+
+meta_SARP1_2_combined_rerun %>%
+  filter(position %in% all_hits_allele_sarp_1_2_3_rerun$position) %>%
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose beta` = meta_allele_dose_beta,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose beta` = meta_allele_afr_dose_beta,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.001")
+
+all_hits_allele_sarp_1_2_3_rerun %>%
+  select(phenotype, chr, position, ref, alt, `Imputed Alt Freq` = alt_frq_imputed, `Imputed N` = n_imputed,
+         `WGS Alt Freq` = alt_frq_wgs, `WGS N` = n_wgs, `META Allele dose beta` = meta_allele_dose_beta,
+         `META Allele dose p` = meta_allele_dose_p, `META Allele Afr dose beta` = meta_allele_afr_dose_beta,
+         `META Allele Afr dose p` = meta_allele_afr_dose_p) %>%
+  datatable(options = list(dom = 'tp'), caption = "Allele dose p < 0.001")
+```
+#### Run locus zoom plots on all of these...
+### looking for the top... use some cut-off
+#### Table, top hits SARP1/2 (meta) with MAF etc. with p-val in SARP 3 beta, etc.
+
+### Start looking at the whites, too.
