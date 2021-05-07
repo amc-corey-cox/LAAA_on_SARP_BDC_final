@@ -154,21 +154,35 @@ select_pheno <- phenos %>%
 
 imputed_IDs <- "imputed_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
   magrittr::extract(. %!in% vcf_lead) %>%
-  # str_replace_all(":", ".") %>% str_c("X", .) %>%
+  str_replace_all(":", ".") %>% str_c("X", .) %>%
   tibble %>% set_names("sample_id") %>%
-  # mutate(FID = sample_id %>% str_extract("(?<=X)[:digit:]*") %>% as.double)
-  mutate(FID = sample_id %>% str_extract("^[:digit:]*") %>% as.double)
+  mutate(FID = sample_id %>% str_extract("(?<=X)[:digit:]*") %>% as.double)
+  # mutate(FID = sample_id %>% str_extract("^[:digit:]*") %>% as.double)
 
 imputed_phenos <- select_pheno %>%
   inner_join(imputed_IDs, by = "FID")
   # filter(FID %in% imputed_IDs, race == 1)
 
-imputed_phenos %>%
-  mutate(FID = sample_id) %>%
-  select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
-  write_tsv("SARP1_2_imputed_phenos_mapping_2.txt")
+# imputed_phenos %>%
+#   mutate(FID = sample_id) %>%
+#   select(FID, IID = sample_id, everything(), -TopMed_ID) %>%
+#   write_tsv("SARP1_2_imputed_phenos_plink.txt")
 
-imputed_phenos %>%
+imputed_phenos %>% write_tsv("SARP1_2_imputed_phenos_mapping_2.txt")
+
+# imputed_phenos_tmp <- imputed_phenos %>% select(-asthma)
+# imputed_phenos %>% 
+#   mutate(across(where(is.character), as_factor)) %>%
+#   summary
+# 
+# imputed_phenos_old <- read_tsv("SARP1_2_imputed_phenos_mapping.txt")
+# imputed_phenos_old <- imputed_phenos_old %>% head(193)
+# imputed_phenos_old %>% write_tsv("SARP1_2_imputed_phenos_mapping_test.txt")
+# 
+# imputed_phenos_old %>%
+#   filter(age >= 12) %>% write_tsv("SARP1_2_imputed_phenos_mapping_test.txt")
+
+t1_imputed_phenos <- imputed_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
          Asthma = recode(asthma, `2` = "Case"), 
          Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
