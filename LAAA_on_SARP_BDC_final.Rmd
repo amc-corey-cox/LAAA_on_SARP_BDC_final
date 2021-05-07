@@ -15,6 +15,7 @@ library(knitr)
 library(DT)
 library(table1)
 library(kableExtra)
+library(writexl)
 
 `%!in%` <- Negate(`%in%`)
 duplicated.all <- function(x) { duplicated(x) | duplicated(x, fromLast = TRUE) }
@@ -177,6 +178,9 @@ t1_imputed_phenos <- imputed_phenos %>%
            two_puff_FEV1 + FVC + maxFVC | cohort,
          data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 1-2 Imputed Demographics and Phenotypes</p>')
 
+t1_imputed_phenos
+t1_imputed_phenos %>% as.data.frame %>% write_xlsx("SARP1_2_imputed_table1.xlsx")
+
 wgs_IDs <- "wgs_vcf_header.txt" %>% read_lines %>% str_split("\t") %>% flatten %>% unlist %>%
   magrittr::extract(. %!in% vcf_lead)
 
@@ -187,7 +191,7 @@ wgs_phenos <- select_pheno %>%
 SARP1.2_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP1-2")
 SARP1.2_wgs_phenos %>% write_tsv("SARP1_2_wgs_phenos_mapping_over12.txt")
 
-SARP1.2_wgs_phenos %>%
+t1_SARP1.2_wgs_phenos <- SARP1.2_wgs_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
          Asthma = recode(asthma, `2` = "Case"), 
          Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
@@ -195,9 +199,13 @@ SARP1.2_wgs_phenos %>%
            two_puff_FEV1 + FVC + maxFVC | cohort,
          data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 1-2 WGS Demographics and Phenotypes</p>')
 
-SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
+t1_SARP1.2_wgs_phenos
+t1_SARP1.2_wgs_phenos %>% as.data.frame %>% write_xlsx("SARP1_2_wgs_table1.xlsx")
 
-SARP3_wgs_phenos %>%
+SARP3_wgs_phenos <- wgs_phenos %>% filter(cohort == "SARP3")
+SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping_over12.txt")
+
+t1_SARP3_wgs_phenos <- SARP3_wgs_phenos %>%
   mutate(Age = age, Race = recode(race, `1` = "African Ancestry"),
          Asthma = recode(asthma, `2` = "Case"), 
          Sex = recode(sex, `1` = "Male", `2` = "Female")) %>%
@@ -205,9 +213,8 @@ SARP3_wgs_phenos %>%
            two_puff_FEV1 + FVC + maxFVC | cohort,
          data = ., caption = '<p style="font-weight:bold;font-size:1.5em;">SARP 3 WGS Demographics and Phenotypes</p>')
 
-SARP3_wgs_phenos %>% write_tsv("SARP3_wgs_phenos_mapping_over12.txt")
-
-intersect(imputed_phenos$TopMed_ID, SARP1.2_wgs_phenos$sample_id)
+t1_SARP3_wgs_phenos
+t1_SARP3_wgs_phenos%>% as.data.frame %>% write_xlsx("SARP3_wgs_table1.xlsx")
 ```
 
 - [X] Create R model files for each outcome phenotype as documented at https://github.com/mdaya/laaa_on_sevenbridges under heading "r_model_file". Scripts Volumes/Promise Pegasus/gitlab/ORTEGA/laaa/scripts/models_*.R have the code I used to run this previously on a local machine
